@@ -1,0 +1,16 @@
+[
+  {
+    "id": "user123",
+    "name": "John Doe",
+    "email": "john.doe@example.com",
+    "age": 35,
+    "gender": "Male",
+    "phone": "+1-555-123-4567",
+    "emergencyContact": "Jane Doe - +1-555-987-6543",
+    "medicalConditions": "None",
+    "allergies": "Penicillin",
+    "medications": "Multivitamin",
+    "createdAt": "2025-01-15T09:00:00Z",
+    "updatedAt": "2025-01-30T10:30:00Z"
+  }
+]
