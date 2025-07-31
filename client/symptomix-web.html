@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Symptomix - Healthcare Diagnostic Tool</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .main-content {
+            padding: 40px;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-top: 30px;
+        }
+        
+        .feature-card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.1);
+        }
+        
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+        
+        .feature-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .feature-description {
+            color: #666;
+            line-height: 1.6;
+        }
+        
+        .symptom-form {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-top: 30px;
+            border: 2px solid #e0e0e0;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        .form-label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #2196F3;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .results {
+            background: #f0f8ff;
+            border-radius: 15px;
+            padding: 30px;
+            margin-top: 30px;
+            border-left: 5px solid #2196F3;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .nav {
+            background: #f8f9fa;
+            padding: 20px 30px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .nav-btn {
+            background: transparent;
+            border: 2px solid #2196F3;
+            color: #2196F3;
+            padding: 10px 20px;
+            border-radius: 25px;
+            margin-right: 15px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-btn:hover,
+        .nav-btn.active {
+            background: #2196F3;
+            color: white;
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        
+        .alert-info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        
+        .status-running {
+            background: #4CAF50;
+        }
+        
+        .status-stopped {
+            background: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function SymptomixApp() {
+            const [currentView, setCurrentView] = useState('home');
+            const [symptoms, setSymptoms] = useState('');
+            const [diagnosis, setDiagnosis] = useState(null);
+            const [isLoading, setIsLoading] = useState(false);
+            const [serverStatus, setServerStatus] = useState('stopped');
+
+            useEffect(() => {
+                checkServerStatus();
+            }, []);
+
+            const checkServerStatus = async () => {
+                try {
+                    const response = await axios.get('https://localhost:7165/api/health', {
+                        timeout: 3000
+                    });
+                    setServerStatus('running');
+                } catch (error) {
+                    setServerStatus('stopped');
+                }
+            };
+
+            const analyzeSyptoms = async () => {
+                if (!symptoms.trim()) return;
+                
+                setIsLoading(true);
+                
+                // Simulate API call with mock data
+                setTimeout(() => {
+                    const mockDiagnosis = {
+                        symptoms: symptoms,
+                        possibleConditions: [
+                            { name: "Common Cold", probability: 85, severity: "Mild" },
+                            { name: "Seasonal Allergies", probability: 60, severity: "Mild" },
+                            { name: "Viral Infection", probability: 45, severity: "Moderate" }
+                        ],
+                        recommendations: [
+                            "Rest and stay hydrated",
+                            "Consider over-the-counter pain relievers",
+                            "Monitor symptoms for 24-48 hours",
+                            "Consult a healthcare provider if symptoms worsen"
+                        ],
+                        urgency: "Low",
+                        nextSteps: "Monitor symptoms and seek medical attention if they persist or worsen."
+                    };
+                    
+                    setDiagnosis(mockDiagnosis);
+                    setIsLoading(false);
+                    setCurrentView('results');
+                }, 1500);
+            };
+
+            const renderHome = () => (
+                <div>
+                    <div className="alert alert-info">
+                        <span className={`status-indicator status-${serverStatus}`}></span>
+                        <strong>Backend Status:</strong> {serverStatus === 'running' ? 'Connected' : 'Using Mock Data'}
+                        {serverStatus === 'stopped' && (
+                            <div style={{marginTop: '10px', fontSize: '0.9rem'}}>
+                                To connect to the backend API, start the .NET server:
+                                <br />
+                                <code>cd server && dotnet run</code>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="feature-grid">
+                        <div className="feature-card" onClick={() => setCurrentView('wizard')}>
+                            <div className="feature-icon">🏥</div>
+                            <div className="feature-title">Symptom Analysis</div>
+                            <div className="feature-description">
+                                Describe your symptoms and get AI-powered diagnostic suggestions with treatment recommendations.
+                            </div>
+                        </div>
+                        
+                        <div className="feature-card" onClick={() => setCurrentView('history')}>
+                            <div className="feature-icon">📊</div>
+                            <div className="feature-title">Health History</div>
+                            <div className="feature-description">
+                                Track your health over time with detailed history and trend analysis.
+                            </div>
+                        </div>
+                        
+                        <div className="feature-card" onClick={() => setCurrentView('profile')}>
+                            <div className="feature-icon">👤</div>
+                            <div className="feature-title">Profile</div>
+                            <div className="feature-description">
+                                Manage your personal health information and preferences.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            const renderWizard = () => (
+                <div className="symptom-form">
+                    <h2 style={{marginBottom: '30px', color: '#333'}}>Describe Your Symptoms</h2>
+                    
+                    <div className="form-group">
+                        <label className="form-label">What symptoms are you experiencing?</label>
+                        <textarea 
+                            className="form-input"
+                            style={{minHeight: '120px', resize: 'vertical'}}
+                            value={symptoms}
+                            onChange={(e) => setSymptoms(e.target.value)}
+                            placeholder="Please describe your symptoms in detail. For example: 'I have a headache, runny nose, and feel tired. Started 2 days ago.'"
+                        />
+                    </div>
+                    
+                    <button 
+                        className="btn" 
+                        onClick={analyzeSyptoms}
+                        disabled={isLoading || !symptoms.trim()}
+                        style={{opacity: (isLoading || !symptoms.trim()) ? 0.6 : 1}}
+                    >
+                        {isLoading ? 'Analyzing...' : 'Analyze Symptoms'}
+                    </button>
+                </div>
+            );
+
+            const renderResults = () => (
+                <div className="results">
+                    <h2 style={{marginBottom: '30px', color: '#333'}}>Diagnostic Analysis Results</h2>
+                    
+                    {diagnosis && (
+                        <div>
+                            <div style={{marginBottom: '30px'}}>
+                                <h3 style={{color: '#2196F3', marginBottom: '15px'}}>Your Symptoms:</h3>
+                                <p style={{padding: '15px', background: 'white', borderRadius: '10px', border: '1px solid #e0e0e0'}}>
+                                    {diagnosis.symptoms}
+                                </p>
+                            </div>
+
+                            <div style={{marginBottom: '30px'}}>
+                                <h3 style={{color: '#2196F3', marginBottom: '15px'}}>Possible Conditions:</h3>
+                                {diagnosis.possibleConditions.map((condition, index) => (
+                                    <div key={index} style={{
+                                        background: 'white', 
+                                        padding: '20px', 
+                                        borderRadius: '10px', 
+                                        marginBottom: '15px',
+                                        border: '1px solid #e0e0e0',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center'
+                                    }}>
+                                        <div>
+                                            <strong>{condition.name}</strong>
+                                            <div style={{color: '#666', fontSize: '0.9rem'}}>
+                                                Severity: {condition.severity}
+                                            </div>
+                                        </div>
+                                        <div style={{
+                                            background: '#e3f2fd',
+                                            padding: '5px 15px',
+                                            borderRadius: '20px',
+                                            color: '#1976d2',
+                                            fontWeight: '600'
+                                        }}>
+                                            {condition.probability}%
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div style={{marginBottom: '30px'}}>
+                                <h3 style={{color: '#2196F3', marginBottom: '15px'}}>Recommendations:</h3>
+                                <ul style={{paddingLeft: '20px'}}>
+                                    {diagnosis.recommendations.map((rec, index) => (
+                                        <li key={index} style={{
+                                            marginBottom: '10px',
+                                            lineHeight: '1.6'
+                                        }}>{rec}</li>
+                                    ))}
+                                </ul>
+                            </div>
+
+                            <div style={{
+                                background: diagnosis.urgency === 'High' ? '#ffebee' : '#e8f5e8',
+                                padding: '20px',
+                                borderRadius: '10px',
+                                border: `2px solid ${diagnosis.urgency === 'High' ? '#f44336' : '#4CAF50'}`
+                            }}>
+                                <h4 style={{
+                                    color: diagnosis.urgency === 'High' ? '#d32f2f' : '#2e7d32',
+                                    marginBottom: '10px'
+                                }}>
+                                    Urgency Level: {diagnosis.urgency}
+                                </h4>
+                                <p>{diagnosis.nextSteps}</p>
+                            </div>
+
+                            <div style={{marginTop: '30px', textAlign: 'center'}}>
+                                <button 
+                                    className="btn" 
+                                    onClick={() => {
+                                        setSymptoms('');
+                                        setDiagnosis(null);
+                                        setCurrentView('wizard');
+                                    }}
+                                    style={{marginRight: '15px'}}
+                                >
+                                    New Analysis
+                                </button>
+                                <button 
+                                    className="btn" 
+                                    onClick={() => setCurrentView('home')}
+                                    style={{background: '#6c757d'}}
+                                >
+                                    Back to Home
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+
+            const renderHistory = () => (
+                <div>
+                    <h2 style={{marginBottom: '30px', color: '#333'}}>Health History</h2>
+                    <div className="alert alert-info">
+                        <strong>Coming Soon:</strong> Your health history and trends will be displayed here.
+                        <br />
+                        This feature will show your past assessments, symptom patterns, and health insights.
+                    </div>
+                </div>
+            );
+
+            const renderProfile = () => (
+                <div>
+                    <h2 style={{marginBottom: '30px', color: '#333'}}>User Profile</h2>
+                    <div className="alert alert-info">
+                        <strong>Coming Soon:</strong> Manage your personal health information and preferences.
+                        <br />
+                        This will include basic health info, emergency contacts, and notification settings.
+                    </div>
+                </div>
+            );
+
+            return (
+                <div className="container">
+                    <div className="header">
+                        <h1>Symptomix</h1>
+                        <p>AI-Powered Healthcare Diagnostic Assistant</p>
+                    </div>
+                    
+                    <div className="nav">
+                        <button 
+                            className={`nav-btn ${currentView === 'home' ? 'active' : ''}`}
+                            onClick={() => setCurrentView('home')}
+                        >
+                            🏠 Home
+                        </button>
+                        <button 
+                            className={`nav-btn ${currentView === 'wizard' ? 'active' : ''}`}
+                            onClick={() => setCurrentView('wizard')}
+                        >
+                            🏥 Symptoms
+                        </button>
+                        <button 
+                            className={`nav-btn ${currentView === 'results' ? 'active' : ''}`}
+                            onClick={() => setCurrentView('results')}
+                            disabled={!diagnosis}
+                            style={{opacity: !diagnosis ? 0.5 : 1}}
+                        >
+                            📋 Results
+                        </button>
+                        <button 
+                            className={`nav-btn ${currentView === 'history' ? 'active' : ''}`}
+                            onClick={() => setCurrentView('history')}
+                        >
+                            📊 History
+                        </button>
+                        <button 
+                            className={`nav-btn ${currentView === 'profile' ? 'active' : ''}`}
+                            onClick={() => setCurrentView('profile')}
+                        >
+                            👤 Profile
+                        </button>
+                    </div>
+                    
+                    <div className="main-content">
+                        {currentView === 'home' && renderHome()}
+                        {currentView === 'wizard' && renderWizard()}
+                        {currentView === 'results' && renderResults()}
+                        {currentView === 'history' && renderHistory()}
+                        {currentView === 'profile' && renderProfile()}
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<SymptomixApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
