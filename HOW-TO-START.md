@@ -9,12 +9,12 @@ Double-click `START-BOTH.bat` - starts both server and client automatically.
 1. **Start Server**: 
    ```powershell
    cd server
-   dotnet run
+   dotnet run --launch-profile http
    ```
 2. **Start Client**: Double-click `client/start.bat` or `client/symptomix-web.html`
 
 ## ✅ Success Indicators
-- Server shows: "Now listening on: https://localhost:7165"
+- Server shows: "Now listening on: http://localhost:5226"
 - Web app shows: 🟢 **Connected** (green status indicator)
 
 ## �️ Files Overview

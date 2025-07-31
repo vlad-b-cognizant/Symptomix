@@ -225,7 +225,7 @@
 
             const checkServerStatus = async () => {
                 try {
-                    const response = await axios.get('https://localhost:7165/api/health', {
+                    const response = await axios.get('http://localhost:5226/api/health', {
                         timeout: 3000
                     });
                     setServerStatus('running');
@@ -273,7 +273,7 @@
                             <div style={{marginTop: '10px', fontSize: '0.9rem'}}>
                                 To connect to the backend API, start the .NET server:
                                 <br />
-                                <code>cd server && dotnet run</code>
+                                <code>cd server && dotnet run --launch-profile http</code>
                             </div>
                         )}
                     </div>
