@@ -157,6 +157,11 @@
             background: #f8f9fa;
             padding: 20px 30px;
             border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
         }
         
         .nav-btn {
@@ -218,9 +223,17 @@
             const [diagnosis, setDiagnosis] = useState(null);
             const [isLoading, setIsLoading] = useState(false);
             const [serverStatus, setServerStatus] = useState('stopped');
+            const [currentUser, setCurrentUser] = useState(null);
+            const [showLogin, setShowLogin] = useState(false);
+            const [userHistory, setUserHistory] = useState([]);
 
             useEffect(() => {
                 checkServerStatus();
+                // Check if user is saved in localStorage
+                const savedUser = localStorage.getItem('symptomix_user');
+                if (savedUser) {
+                    setCurrentUser(JSON.parse(savedUser));
+                }
             }, []);
 
             const checkServerStatus = async () => {
@@ -234,13 +247,112 @@
                 }
             };
 
+            const login = async (email, name) => {
+                try {
+                    if (serverStatus === 'running') {
+                        const response = await axios.post('http://localhost:5226/api/auth/login', {
+                            email: email,
+                            name: name
+                        });
+                        const user = response.data;
+                        setCurrentUser(user);
+                        localStorage.setItem('symptomix_user', JSON.stringify(user));
+                        setShowLogin(false);
+                        loadUserHistory(user.id);
+                    } else {
+                        // Mock user for offline mode
+                        const mockUser = {
+                            id: 'mock-user-' + Date.now(),
+                            email: email,
+                            name: name || 'Demo User'
+                        };
+                        setCurrentUser(mockUser);
+                        localStorage.setItem('symptomix_user', JSON.stringify(mockUser));
+                        setShowLogin(false);
+                    }
+                } catch (error) {
+                    console.error('Login error:', error);
+                    alert('Login failed. Please try again.');
+                }
+            };
+
+            const logout = () => {
+                setCurrentUser(null);
+                localStorage.removeItem('symptomix_user');
+                setUserHistory([]);
+                setCurrentView('home');
+            };
+
+            const loadUserHistory = async (userId) => {
+                try {
+                    if (serverStatus === 'running' && userId) {
+                        const response = await axios.get(`http://localhost:5226/api/assessments/history/${userId}`);
+                        setUserHistory(response.data);
+                    }
+                } catch (error) {
+                    console.error('Error loading history:', error);
+                }
+            };
+
             const analyzeSyptoms = async () => {
                 if (!symptoms.trim()) return;
                 
                 setIsLoading(true);
                 
-                // Simulate API call with mock data
-                setTimeout(() => {
+                try {
+                    if (serverStatus === 'running' && currentUser) {
+                        // Use real API
+                        const response = await axios.post('http://localhost:5226/api/assessments/analyze', {
+                            userId: currentUser.id,
+                            symptoms: symptoms
+                        });
+                        
+                        const apiResult = response.data;
+                        const diagnosis = {
+                            symptoms: symptoms,
+                            possibleConditions: [
+                                { 
+                                    name: apiResult.primaryDiagnosis, 
+                                    probability: Math.round(apiResult.confidence * 100), 
+                                    severity: apiResult.urgency === 'High' ? 'High' : 'Moderate' 
+                                },
+                                ...(apiResult.alternativeDiagnoses || []).map(alt => ({
+                                    name: alt.condition,
+                                    probability: Math.round(alt.confidence * 100),
+                                    severity: 'Moderate'
+                                }))
+                            ],
+                            recommendations: (apiResult.recommendations || []).map(rec => rec.description),
+                            urgency: apiResult.urgency || 'Low',
+                            nextSteps: apiResult.urgencyMessage || "Monitor symptoms and seek medical attention if they persist or worsen."
+                        };
+                        
+                        setDiagnosis(diagnosis);
+                        // Reload history to show new assessment
+                        loadUserHistory(currentUser.id);
+                    } else {
+                        // Use mock data
+                        const mockDiagnosis = {
+                            symptoms: symptoms,
+                            possibleConditions: [
+                                { name: "Common Cold", probability: 85, severity: "Mild" },
+                                { name: "Seasonal Allergies", probability: 60, severity: "Mild" },
+                                { name: "Viral Infection", probability: 45, severity: "Moderate" }
+                            ],
+                            recommendations: [
+                                "Rest and stay hydrated",
+                                "Consider over-the-counter pain relievers",
+                                "Monitor symptoms for 24-48 hours",
+                                "Consult a healthcare provider if symptoms worsen"
+                            ],
+                            urgency: "Low",
+                            nextSteps: "Monitor symptoms and seek medical attention if they persist or worsen."
+                        };
+                        setDiagnosis(mockDiagnosis);
+                    }
+                } catch (error) {
+                    console.error('Analysis error:', error);
+                    // Fall back to mock data on error
                     const mockDiagnosis = {
                         symptoms: symptoms,
                         possibleConditions: [
@@ -257,11 +369,11 @@
                         urgency: "Low",
                         nextSteps: "Monitor symptoms and seek medical attention if they persist or worsen."
                     };
-                    
                     setDiagnosis(mockDiagnosis);
-                    setIsLoading(false);
-                    setCurrentView('results');
-                }, 1500);
+                }
+                
+                setIsLoading(false);
+                setCurrentView('results');
             };
 
             const renderHome = () => (
@@ -306,31 +418,52 @@
                 </div>
             );
 
-            const renderWizard = () => (
-                <div className="symptom-form">
-                    <h2 style={{marginBottom: '30px', color: '#333'}}>Describe Your Symptoms</h2>
-                    
-                    <div className="form-group">
-                        <label className="form-label">What symptoms are you experiencing?</label>
-                        <textarea 
-                            className="form-input"
-                            style={{minHeight: '120px', resize: 'vertical'}}
-                            value={symptoms}
-                            onChange={(e) => setSymptoms(e.target.value)}
-                            placeholder="Please describe your symptoms in detail. For example: 'I have a headache, runny nose, and feel tired. Started 2 days ago.'"
-                        />
+            const renderWizard = () => {
+                if (!currentUser) {
+                    return (
+                        <div className="symptom-form">
+                            <h2 style={{marginBottom: '30px', color: '#333'}}>Login Required</h2>
+                            <div className="alert alert-info">
+                                <strong>Please login first</strong> to analyze your symptoms and save your health history.
+                                <br />
+                                <button 
+                                    className="btn" 
+                                    onClick={() => setShowLogin(true)}
+                                    style={{marginTop: '15px'}}
+                                >
+                                    Login to Continue
+                                </button>
+                            </div>
+                        </div>
+                    );
+                }
+
+                return (
+                    <div className="symptom-form">
+                        <h2 style={{marginBottom: '30px', color: '#333'}}>Describe Your Symptoms</h2>
+                        
+                        <div className="form-group">
+                            <label className="form-label">What symptoms are you experiencing?</label>
+                            <textarea 
+                                className="form-input"
+                                style={{minHeight: '120px', resize: 'vertical'}}
+                                value={symptoms}
+                                onChange={(e) => setSymptoms(e.target.value)}
+                                placeholder="Please describe your symptoms in detail. For example: 'I have a headache, runny nose, and feel tired. Started 2 days ago.'"
+                            />
+                        </div>
+                        
+                        <button 
+                            className="btn" 
+                            onClick={analyzeSyptoms}
+                            disabled={isLoading || !symptoms.trim()}
+                            style={{opacity: (isLoading || !symptoms.trim()) ? 0.6 : 1}}
+                        >
+                            {isLoading ? 'Analyzing...' : 'Analyze Symptoms'}
+                        </button>
                     </div>
-                    
-                    <button 
-                        className="btn" 
-                        onClick={analyzeSyptoms}
-                        disabled={isLoading || !symptoms.trim()}
-                        style={{opacity: (isLoading || !symptoms.trim()) ? 0.6 : 1}}
-                    >
-                        {isLoading ? 'Analyzing...' : 'Analyze Symptoms'}
-                    </button>
-                </div>
-            );
+                );
+            };
 
             const renderResults = () => (
                 <div className="results">
@@ -429,16 +562,71 @@
                 </div>
             );
 
-            const renderHistory = () => (
-                <div>
-                    <h2 style={{marginBottom: '30px', color: '#333'}}>Health History</h2>
-                    <div className="alert alert-info">
-                        <strong>Coming Soon:</strong> Your health history and trends will be displayed here.
-                        <br />
-                        This feature will show your past assessments, symptom patterns, and health insights.
+            const renderHistory = () => {
+                useEffect(() => {
+                    if (currentUser) {
+                        loadUserHistory(currentUser.id);
+                    }
+                }, [currentUser]);
+
+                return (
+                    <div>
+                        <h2 style={{marginBottom: '30px', color: '#333'}}>Health History</h2>
+                        
+                        {!currentUser ? (
+                            <div className="alert alert-info">
+                                <strong>Login Required:</strong> Please login to view your health history.
+                                <br />
+                                <button 
+                                    className="btn" 
+                                    onClick={() => setShowLogin(true)}
+                                    style={{marginTop: '15px'}}
+                                >
+                                    Login to View History
+                                </button>
+                            </div>
+                        ) : userHistory.length === 0 ? (
+                            <div className="alert alert-info">
+                                <strong>No History Yet:</strong> You haven't completed any assessments yet.
+                                <br />
+                                Start by analyzing your symptoms to build your health history!
+                            </div>
+                        ) : (
+                            <div>
+                                {userHistory.map((assessment, index) => (
+                                    <div key={assessment.id || index} style={{
+                                        background: '#f8f9fa',
+                                        border: '1px solid #e0e0e0',
+                                        borderRadius: '15px',
+                                        padding: '20px',
+                                        marginBottom: '20px'
+                                    }}>
+                                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px'}}>
+                                            <h4 style={{color: '#2196F3', margin: 0}}>Assessment #{index + 1}</h4>
+                                            <span style={{color: '#666', fontSize: '0.9rem'}}>
+                                                {new Date(assessment.date).toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                        
+                                        <div style={{marginBottom: '10px'}}>
+                                            <strong>Symptoms:</strong> {assessment.symptoms?.join(', ') || 'N/A'}
+                                        </div>
+                                        
+                                        <div style={{marginBottom: '10px'}}>
+                                            <strong>Primary Diagnosis:</strong> {assessment.diagnosis}
+                                        </div>
+                                        
+                                        <div style={{display: 'flex', gap: '20px'}}>
+                                            <span><strong>Confidence:</strong> {Math.round(assessment.confidence * 100)}%</span>
+                                            <span><strong>Urgency:</strong> {assessment.urgency}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
-                </div>
-            );
+                );
+            };
 
             const renderProfile = () => (
                 <div>
@@ -451,6 +639,85 @@
                 </div>
             );
 
+            const renderLogin = () => {
+                const [email, setEmail] = useState('');
+                const [name, setName] = useState('');
+
+                const handleLogin = (e) => {
+                    e.preventDefault();
+                    if (email.trim()) {
+                        login(email.trim(), name.trim() || 'User');
+                    }
+                };
+
+                return (
+                    <div style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'rgba(0,0,0,0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1000
+                    }}>
+                        <div style={{
+                            background: 'white',
+                            padding: '40px',
+                            borderRadius: '15px',
+                            maxWidth: '400px',
+                            width: '90%',
+                            boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
+                        }}>
+                            <h2 style={{marginBottom: '20px', textAlign: 'center', color: '#333'}}>
+                                Login to Symptomix
+                            </h2>
+                            <p style={{marginBottom: '30px', textAlign: 'center', color: '#666'}}>
+                                Enter your email to save your health assessments
+                            </p>
+                            <form onSubmit={handleLogin}>
+                                <div className="form-group">
+                                    <label className="form-label">Email Address *</label>
+                                    <input 
+                                        type="email"
+                                        className="form-input"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        placeholder="your@email.com"
+                                        required
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Your Name (Optional)</label>
+                                    <input 
+                                        type="text"
+                                        className="form-input"
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        placeholder="Your Name"
+                                    />
+                                </div>
+                                <div style={{display: 'flex', gap: '15px', marginTop: '30px'}}>
+                                    <button type="submit" className="btn" style={{flex: 1}}>
+                                        Login / Register
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        className="btn" 
+                                        onClick={() => setShowLogin(false)}
+                                        style={{flex: 1, background: '#6c757d'}}
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                );
+            };
+
             return (
                 <div className="container">
                     <div className="header">
@@ -459,38 +726,65 @@
                     </div>
                     
                     <div className="nav">
-                        <button 
-                            className={`nav-btn ${currentView === 'home' ? 'active' : ''}`}
-                            onClick={() => setCurrentView('home')}
-                        >
-                            🏠 Home
-                        </button>
-                        <button 
-                            className={`nav-btn ${currentView === 'wizard' ? 'active' : ''}`}
-                            onClick={() => setCurrentView('wizard')}
-                        >
-                            🏥 Symptoms
-                        </button>
-                        <button 
-                            className={`nav-btn ${currentView === 'results' ? 'active' : ''}`}
-                            onClick={() => setCurrentView('results')}
-                            disabled={!diagnosis}
-                            style={{opacity: !diagnosis ? 0.5 : 1}}
-                        >
-                            📋 Results
-                        </button>
-                        <button 
-                            className={`nav-btn ${currentView === 'history' ? 'active' : ''}`}
-                            onClick={() => setCurrentView('history')}
-                        >
-                            📊 History
-                        </button>
-                        <button 
-                            className={`nav-btn ${currentView === 'profile' ? 'active' : ''}`}
-                            onClick={() => setCurrentView('profile')}
-                        >
-                            👤 Profile
-                        </button>
+                        <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
+                            <button 
+                                className={`nav-btn ${currentView === 'home' ? 'active' : ''}`}
+                                onClick={() => setCurrentView('home')}
+                            >
+                                🏠 Home
+                            </button>
+                            <button 
+                                className={`nav-btn ${currentView === 'wizard' ? 'active' : ''}`}
+                                onClick={() => setCurrentView('wizard')}
+                            >
+                                🏥 Symptoms
+                            </button>
+                            <button 
+                                className={`nav-btn ${currentView === 'results' ? 'active' : ''}`}
+                                onClick={() => setCurrentView('results')}
+                                disabled={!diagnosis}
+                                style={{opacity: !diagnosis ? 0.5 : 1}}
+                            >
+                                📋 Results
+                            </button>
+                            <button 
+                                className={`nav-btn ${currentView === 'history' ? 'active' : ''}`}
+                                onClick={() => setCurrentView('history')}
+                            >
+                                📊 History
+                            </button>
+                            <button 
+                                className={`nav-btn ${currentView === 'profile' ? 'active' : ''}`}
+                                onClick={() => setCurrentView('profile')}
+                            >
+                                👤 Profile
+                            </button>
+                        </div>
+                        
+                        <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
+                            {currentUser ? (
+                                <>
+                                    <span style={{color: '#666', fontSize: '0.9rem'}}>
+                                        Welcome, {currentUser.name || currentUser.email}
+                                    </span>
+                                    <button 
+                                        className="nav-btn"
+                                        onClick={logout}
+                                        style={{background: '#f44336', borderColor: '#f44336'}}
+                                    >
+                                        🚪 Logout
+                                    </button>
+                                </>
+                            ) : (
+                                <button 
+                                    className="nav-btn"
+                                    onClick={() => setShowLogin(true)}
+                                    style={{background: '#4CAF50', borderColor: '#4CAF50'}}
+                                >
+                                    🔑 Login
+                                </button>
+                            )}
+                        </div>
                     </div>
                     
                     <div className="main-content">
@@ -499,6 +793,7 @@
                         {currentView === 'results' && renderResults()}
                         {currentView === 'history' && renderHistory()}
                         {currentView === 'profile' && renderProfile()}
+                        {showLogin && renderLogin()}
                     </div>
                 </div>
             );

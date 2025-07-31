@@ -13,6 +13,8 @@ namespace SymptomixAPI.Services
     {
         Task<User> CreateUserAsync(User user);
         Task<User?> GetUserAsync(string userId);
+        Task<User?> GetUserByIdAsync(string userId);
+        Task<User?> GetUserByEmailAsync(string email);
         Task<User> UpdateUserAsync(string userId, User user);
         Task<bool> DeleteUserAsync(string userId);
     }

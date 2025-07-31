@@ -22,6 +22,17 @@ namespace SymptomixAPI.Services
             return await _dataService.GetByIdAsync<User>("users", userId);
         }
 
+        public async Task<User?> GetUserByIdAsync(string userId)
+        {
+            return await _dataService.GetByIdAsync<User>("users", userId);
+        }
+
+        public async Task<User?> GetUserByEmailAsync(string email)
+        {
+            var users = await _dataService.LoadDataAsync<User>("users");
+            return users.FirstOrDefault(u => u.Email?.Equals(email, StringComparison.OrdinalIgnoreCase) == true);
+        }
+
         public async Task<User> UpdateUserAsync(string userId, User user)
         {
             var success = await _dataService.UpdateAsync("users", userId, user);
