@@ -36,7 +36,7 @@ const SYMPTOM_QUESTIONS = [
   },
   {
     id: 'duration',
-    type: 'single_choice',
+    type: 'multiple_choice',
     question: 'How long have you been experiencing these symptoms?',
     options: [
       'Less than 24 hours',
@@ -46,10 +46,11 @@ const SYMPTOM_QUESTIONS = [
       'More than a month'
     ],
     required: true,
+    multiple: false,
   },
   {
     id: 'severity',
-    type: 'single_choice',
+    type: 'multiple_choice',
     question: 'How would you rate the severity of your symptoms?',
     options: [
       'Mild - Does not interfere with daily activities',
@@ -58,6 +59,7 @@ const SYMPTOM_QUESTIONS = [
       'Very severe - Unable to perform normal activities'
     ],
     required: true,
+    multiple: false,
   },
   {
     id: 'fever_temp',
@@ -86,9 +88,10 @@ const SYMPTOM_QUESTIONS = [
   },
   {
     id: 'recent_travel',
-    type: 'single_choice',
+    type: 'multiple_choice',
     question: 'Have you traveled recently or been exposed to sick individuals?',
     options: ['Yes', 'No', 'Not sure'],
+    multiple: false,
   },
 ];
 
